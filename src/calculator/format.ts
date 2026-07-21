@@ -16,7 +16,7 @@ export function formatNumber(value: number): string {
   const rounded = roundForDisplay(value);
 
   if (!Number.isFinite(rounded)) {
-    return String(rounded);
+    return 'Overflow';
   }
 
   const absolute = Math.abs(rounded);
