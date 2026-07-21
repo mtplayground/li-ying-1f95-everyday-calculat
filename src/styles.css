@@ -100,9 +100,12 @@
     justify-content: flex-end;
     padding: 24px 0;
     overflow: hidden;
+    text-align: right;
     white-space: nowrap;
-    font-size: clamp(3rem, 14vw, 4.75rem);
+    text-overflow: clip;
+    font-size: var(--display-font-size, 4.75rem);
     font-weight: 600;
     line-height: 1;
+    letter-spacing: 0;
   }
 }
