@@ -1,0 +1,63 @@
+Architecture plan for the everyday calculator
+
+Product shape
+- Build a React + TypeScript single-page app with Vite.
+- The app is one portrait-first calculator screen with a static production bundle.
+- Use Tailwind CSS for the neutral visual system described in the issues.
+
+Module structure and file organization
+- Root config:
+  - package.json, package-lock.json or equivalent lockfile, tsconfig files, vite.config.ts
+  - eslint/prettier configuration if selected during skeleton work
+  - tailwind.config.ts, postcss.config.js, src/index.css for design tokens and global interaction rules
+- App entry:
+  - src/main.tsx mounts React
+  - src/App.tsx renders the calculator screen only; no router
+- Calculator domain:
+  - src/calculator/engine.ts contains the pure state machine and exported action dispatcher
+  - src/calculator/format.ts contains decimal-safe result formatting and display precision capping
+  - src/calculator/types.ts contains shared CalculatorState, CalculatorAction, Operator, and error-state types
+- UI components:
+  - src/components/CalculatorScreen.tsx owns React state and dispatch wiring
+  - src/components/Display.tsx renders the current value, expression, result, or error message
+  - src/components/Keypad.tsx defines the everyday-calculator button layout
+  - src/components/CalcButton.tsx implements accessible buttons and press feedback
+- Tests:
+  - src/calculator/engine.test.ts covers calculation rules and error recovery
+  - e2e/calculator.spec.ts covers real UI flows and portrait viewport fit
+
+Shared types and state
+- CalculatorState should be serializable and UI-independent.
+- Expected state fields:
+  - display: string, the exact text the display component renders
+  - currentEntry: string, the editable numeric entry
+  - accumulator: number | null, the left-hand accumulated value
+  - pendingOperator: Operator | null
+  - status: "editing" | "operator-pending" | "result" | "error"
+  - errorMessage?: string
+- CalculatorAction should model UI intent rather than button labels:
+  - digit, decimal, operator, percent, equals, clear
+- Operators should be stored as semantic values: add, subtract, multiply, divide.
+
+Issue dependencies
+- #1 creates the React + TypeScript Vite skeleton and baseline app entry.
+- #2 adds Tailwind and global visual/mobile interaction rules; depends on #1.
+- #3 creates the pure calculator engine and formatting helpers; depends on #1.
+- #4 extends the engine with recoverable errors and overflow handling; depends on #3.
+- #5 adds unit tests for the engine rules; depends on #3 and #4.
+- #6 builds the display component; depends on #2 and #3.
+- #7 builds the keypad and reusable button component; depends on #2.
+- #8 adds touch-down press feedback to the button component; depends on #7.
+- #9 wires UI buttons to the engine and display; depends on #3, #6, and #7.
+- #10 adds Playwright end-to-end coverage; depends on #9.
+
+Key design decisions
+- Keep calculation behavior isolated from React so arithmetic rules can be tested without a browser.
+- Use reducer-style state transitions for rapid taps and predictable action handling.
+- Evaluate chained operators left-to-right when the next operator is pressed, matching everyday calculator behavior.
+- Treat repeated equals as a no-op after a completed calculation.
+- Represent errors as explicit state, never as raw Infinity or NaN, and recover on clear or fresh digit input.
+- Format numbers centrally to avoid inconsistent display behavior between unit tests and UI.
+- Keep the visual language neutral: high-contrast dark text, near-white background, light button surfaces, small radii, and subtle shadows.
+- Use semantic buttons with aria-labels so the E2E tests can target the real accessible UI.
+- Keep the app fully static unless a future issue explicitly adds server behavior.
