@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 
 export type CalcButtonKind = 'digit' | 'operator' | 'action' | 'equals';
 
@@ -31,9 +31,24 @@ export function CalcButton({
     .filter(Boolean)
     .join(' ');
 
+  function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    setIsPressed(true);
+    onPress?.();
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.repeat) {
+      return;
+    }
+
     if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
       setIsPressed(true);
+      onPress?.();
     }
   }
 
@@ -48,14 +63,13 @@ export function CalcButton({
       type="button"
       className={classes}
       aria-label={ariaLabel}
-      onPointerDown={() => setIsPressed(true)}
+      onPointerDown={handlePointerDown}
       onPointerUp={() => setIsPressed(false)}
       onPointerLeave={() => setIsPressed(false)}
       onPointerCancel={() => setIsPressed(false)}
       onBlur={() => setIsPressed(false)}
       onKeyDown={handleKeyDown}
       onKeyUp={handleKeyUp}
-      onClick={onPress}
     >
       {label}
     </button>
