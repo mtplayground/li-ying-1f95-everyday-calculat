@@ -1,6 +1,9 @@
 import { formatNumber, roundForDisplay } from './format';
 import type { CalculatorAction, CalculatorState, Digit, Operator } from './types';
 
+const DIVIDE_BY_ZERO_MESSAGE = "Can't divide by zero";
+const OVERFLOW_MESSAGE = 'Result is too large';
+
 export const initialCalculatorState: CalculatorState = {
   currentEntry: '0',
   pendingOperator: null,
@@ -18,6 +21,8 @@ export function reduceCalculatorState(
   action: CalculatorAction,
 ): CalculatorState {
   switch (action.type) {
+    case 'clear':
+      return createInitialCalculatorState();
     case 'digit':
       return inputDigit(state, action.digit);
     case 'decimal':
@@ -28,13 +33,11 @@ export function reduceCalculatorState(
       return inputPercent(state);
     case 'equals':
       return inputEquals(state);
-    case 'clear':
-      return createInitialCalculatorState();
   }
 }
 
 function inputDigit(state: CalculatorState, digit: Digit): CalculatorState {
-  if (state.status === 'result') {
+  if (state.status === 'result' || state.status === 'error') {
     return entryState(digit);
   }
 
@@ -58,7 +61,7 @@ function inputDigit(state: CalculatorState, digit: Digit): CalculatorState {
 }
 
 function inputDecimal(state: CalculatorState): CalculatorState {
-  if (state.status === 'result') {
+  if (state.status === 'result' || state.status === 'error') {
     return entryState('0.');
   }
 
@@ -85,6 +88,10 @@ function inputDecimal(state: CalculatorState): CalculatorState {
 }
 
 function inputOperator(state: CalculatorState, operator: Operator): CalculatorState {
+  if (state.status === 'error') {
+    return state;
+  }
+
   if (state.status === 'operator-pending') {
     return {
       ...state,
@@ -93,6 +100,10 @@ function inputOperator(state: CalculatorState, operator: Operator): CalculatorSt
   }
 
   const currentValue = parseEntry(state.currentEntry);
+
+  if (!Number.isFinite(currentValue)) {
+    return errorState(OVERFLOW_MESSAGE);
+  }
 
   if (state.accumulator === null || state.pendingOperator === null || state.status === 'result') {
     return {
@@ -106,24 +117,41 @@ function inputOperator(state: CalculatorState, operator: Operator): CalculatorSt
   }
 
   const result = calculate(state.accumulator, currentValue, state.pendingOperator);
-  const display = formatNumber(result);
+
+  if (!result.ok) {
+    return errorState(result.message);
+  }
+
+  const display = formatNumber(result.value);
 
   return {
     currentEntry: display,
     pendingOperator: operator,
-    accumulator: result,
+    accumulator: result.value,
     display,
     status: 'operator-pending',
   };
 }
 
 function inputPercent(state: CalculatorState): CalculatorState {
+  if (state.status === 'error') {
+    return state;
+  }
+
   if (state.status === 'operator-pending') {
     return state;
   }
 
   const currentValue = parseEntry(state.currentEntry);
+  if (!Number.isFinite(currentValue)) {
+    return errorState(OVERFLOW_MESSAGE);
+  }
+
   const percentValue = getPercentValue(currentValue, state.accumulator, state.pendingOperator);
+  if (!Number.isFinite(percentValue)) {
+    return errorState(OVERFLOW_MESSAGE);
+  }
+
   const display = formatNumber(percentValue);
 
   return {
@@ -135,6 +163,10 @@ function inputPercent(state: CalculatorState): CalculatorState {
 }
 
 function inputEquals(state: CalculatorState): CalculatorState {
+  if (state.status === 'error') {
+    return state;
+  }
+
   if (state.pendingOperator === null || state.accumulator === null || state.status === 'result') {
     return state;
   }
@@ -151,17 +183,23 @@ function inputEquals(state: CalculatorState): CalculatorState {
     };
   }
 
-  const result = calculate(
-    state.accumulator,
-    parseEntry(state.currentEntry),
-    state.pendingOperator,
-  );
-  const display = formatNumber(result);
+  const currentValue = parseEntry(state.currentEntry);
+  if (!Number.isFinite(currentValue)) {
+    return errorState(OVERFLOW_MESSAGE);
+  }
+
+  const result = calculate(state.accumulator, currentValue, state.pendingOperator);
+
+  if (!result.ok) {
+    return errorState(result.message);
+  }
+
+  const display = formatNumber(result.value);
 
   return {
     currentEntry: display,
     pendingOperator: null,
-    accumulator: result,
+    accumulator: result.value,
     display,
     status: 'result',
   };
@@ -174,6 +212,17 @@ function entryState(entry: string): CalculatorState {
     accumulator: null,
     display: entry,
     status: 'editing',
+  };
+}
+
+function errorState(message: string): CalculatorState {
+  return {
+    currentEntry: '0',
+    pendingOperator: null,
+    accumulator: null,
+    display: message,
+    status: 'error',
+    errorMessage: message,
   };
 }
 
@@ -193,7 +242,9 @@ function getPercentValue(
   return currentValue / 100;
 }
 
-function calculate(left: number, right: number, operator: Operator): number {
+type CalculationResult = { ok: true; value: number } | { ok: false; message: string };
+
+function calculate(left: number, right: number, operator: Operator): CalculationResult {
   let result: number;
 
   switch (operator) {
@@ -207,11 +258,25 @@ function calculate(left: number, right: number, operator: Operator): number {
       result = left * right;
       break;
     case 'divide':
+      if (right === 0) {
+        return { ok: false, message: DIVIDE_BY_ZERO_MESSAGE };
+      }
+
       result = left / right;
       break;
   }
 
-  return roundForDisplay(result);
+  if (!Number.isFinite(result)) {
+    return { ok: false, message: OVERFLOW_MESSAGE };
+  }
+
+  const rounded = roundForDisplay(result);
+
+  if (!Number.isFinite(rounded)) {
+    return { ok: false, message: OVERFLOW_MESSAGE };
+  }
+
+  return { ok: true, value: rounded };
 }
 
 function parseEntry(entry: string): number {
