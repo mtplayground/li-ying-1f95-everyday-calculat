@@ -1,5 +1,6 @@
 import { initialCalculatorState } from './calculator/engine';
 import { Display } from './components/Display';
+import { Keypad } from './components/Keypad';
 
 export function App() {
   return (
@@ -9,6 +10,7 @@ export function App() {
         aria-label="Calculator screen"
       >
         <Display state={initialCalculatorState} />
+        <Keypad />
       </section>
     </main>
   );
